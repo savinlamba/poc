@@ -1,0 +1,87 @@
+import streamlit as st
+import google.generativeai as genai
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+
+# Configure the API key if available
+if api_key:
+    try:
+        genai.configure(api_key=api_key)
+        st.write("API key configured successfully.")
+    except Exception as e:
+        st.error(f"Configuration error: {e}")
+else:
+    st.error("API key not found. Make sure GEMINI_API_KEY is set in your environment.")
+
+# Initialize chat history
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# Chat display function
+def display_chat():
+    st.title("Chat with Gemini")
+    st.write("---")
+    for message in st.session_state.chat_history:
+        if message["role"] == "user":
+            st.write(f"**You:** {message['content']}")
+        else:
+            st.write(f"**Gemini:** {message['content']}")
+    st.write("---")
+
+# Display chat history
+display_chat()
+
+#to detect the language of code
+def detect_language(code):
+    """Detects the programming language based on syntax patterns."""
+    python_keywords = {'def', 'import', 'self', 'class', 'return'}
+    js_keywords = {'function', 'const', 'let', 'var', 'export'}
+    java_keywords = {'public', 'class', 'void', 'static', 'int'}
+    cpp_keywords = {'#include', 'std::', 'int', 'cout', 'cin'}
+    c_keywords = {'#include', 'printf', 'scanf', 'int', 'return'}
+
+    # Simple heuristics based on keywords and syntax
+    if any(keyword in code for keyword in python_keywords):
+        return "python"
+    elif any(keyword in code for keyword in js_keywords):
+        return "javascript"
+    elif any(keyword in code for keyword in java_keywords):
+        return "java"
+    elif any(keyword in code for keyword in cpp_keywords):
+        return "cpp"
+    elif any(keyword in code for keyword in c_keywords):
+        return "c"
+    else:
+        return "unknown"
+
+# Function to handle user input and response generation
+def handle_user_input():
+    user_input = st.session_state.input_box
+    st.session_state.chat_history.append({"role": "user", "content": user_input})
+    print('hii')
+    print(detect_language(user_input))
+    
+
+    # Generate response
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")  # Adjust model name if needed
+        response = model.generate_content(user_input)  # Generate response using the provided input
+        response_text = response.candidates[0].content.parts[0].text  # Extract response text as specified
+
+        # Append Gemini's response to chat history
+        st.session_state.chat_history.append({"role": "gemini", "content": response_text})
+    except Exception as e:
+        st.error(f"An error occurred during generation: {e}")
+        st.session_state.chat_history.append({"role": "gemini", "content": "An error occurred. Please try again."})
+
+    # Clear the input box
+    st.session_state.input_box = ""
+
+# Form to handle input submission with "Enter" or "Send" button
+with st.form(key="chat_form", clear_on_submit=True):
+    st.text_input("Type your message:", key="input_box")
+    st.form_submit_button("Send", on_click=handle_user_input)
